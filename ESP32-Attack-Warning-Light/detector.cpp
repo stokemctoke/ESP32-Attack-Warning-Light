@@ -1,11 +1,18 @@
 #include "detector.h"
+#include "settings.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include <WiFi.h>
 
 // ── Frame counters (written by promiscuous callback, read by detector task) ───
 static volatile uint32_t deauth_count  = 0;
 static volatile uint32_t probe_count   = 0;
 static volatile uint32_t beacon_count  = 0;
+
+// Last completed window snapshot — exposed to web status endpoint.
+volatile uint32_t g_last_deauth = 0;
+volatile uint32_t g_last_beacon = 0;
+volatile uint32_t g_last_probe  = 0;
 
 // ── Promiscuous callback ───────────────────────────────────────────────────────
 // Keep this as short as possible: increment counters only, no logic.
@@ -33,9 +40,9 @@ static void IRAM_ATTR promiscuous_cb(void* buf, wifi_promiscuous_pkt_type_t type
 static uint32_t last_detection_ms = 0;
 
 static void evaluate_thresholds(uint32_t deauth, uint32_t probe, uint32_t beacon) {
-    bool att_deauth = deauth >= DEAUTH_THRESHOLD;
-    bool att_beacon = beacon >= BEACON_THRESHOLD;
-    bool att_probe  = probe  >= PROBE_THRESHOLD;
+    bool att_deauth = deauth >= g_deauth_thresh;
+    bool att_beacon = beacon >= g_beacon_thresh;
+    bool att_probe  = probe  >= g_probe_thresh;
     int  active     = (int)att_deauth + (int)att_beacon + (int)att_probe;
 
     if (active > 0) {
@@ -61,7 +68,7 @@ static void evaluate_thresholds(uint32_t deauth, uint32_t probe, uint32_t beacon
     xSemaphoreGive(g_state_mutex);
 
     if (cur == STATE_AMBIENT || cur == STATE_TRANSITIONING) return;
-    if (millis() - last_detection_ms < ALERT_COOLDOWN) return;
+    if (millis() - last_detection_ms < g_alert_cooldown) return;
 
     if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(10))) {
         g_device_state = STATE_AMBIENT;
@@ -70,27 +77,20 @@ static void evaluate_thresholds(uint32_t deauth, uint32_t probe, uint32_t beacon
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
+// WiFi must already be running (started by webserver_init via WiFi.softAP).
 void detector_init() {
-    esp_event_loop_create_default(); // no-op if already created by Arduino core
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&cfg);
-    esp_wifi_set_storage(WIFI_STORAGE_RAM);
-    esp_wifi_set_mode(WIFI_MODE_NULL);
-    esp_wifi_start();
-    // Hardware filter: only deliver management frames to the callback
     wifi_promiscuous_filter_t filter = {
         .filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT
     };
     esp_wifi_set_promiscuous_filter(&filter);
     esp_wifi_set_promiscuous(true);
     esp_wifi_set_promiscuous_rx_cb(promiscuous_cb);
-    esp_wifi_set_channel(WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
+    esp_wifi_set_channel(DEFAULT_WIFI_CHANNEL, WIFI_SECOND_CHAN_NONE);
 }
 
 // ── Task ──────────────────────────────────────────────────────────────────────
 void detector_task(void* pvParameters) {
-    uint8_t  channel      = WIFI_CHANNEL;
+    uint8_t  channel      = DEFAULT_WIFI_CHANNEL;
     uint32_t last_hop_ms  = millis();
     uint32_t window_start = millis();
 
@@ -98,20 +98,26 @@ void detector_task(void* pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(10));
         uint32_t now = millis();
 
-        // Channel hop
-        if (now - last_hop_ms >= CHANNEL_HOP_MS) {
-            channel = (channel % 13) + 1;
-            esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+        // Channel hop — paused while a web client is connected so the AP stays
+        // on a stable channel and the browser connection isn't disrupted.
+        if (now - last_hop_ms >= g_channel_hop_ms) {
+            if (WiFi.softAPgetStationNum() == 0) {
+                channel = (channel % 13) + 1;
+                esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
+            }
             last_hop_ms = now;
         }
 
         // Detection window
-        if (now - window_start >= DETECTION_WINDOW) {
-            // Snapshot and reset (slight race is acceptable for threshold detection)
+        if (now - window_start >= g_detect_window) {
             uint32_t snap_deauth  = deauth_count;  deauth_count  = 0;
             uint32_t snap_probe   = probe_count;   probe_count   = 0;
             uint32_t snap_beacon  = beacon_count;  beacon_count  = 0;
             window_start = now;
+
+            g_last_deauth = snap_deauth;
+            g_last_probe  = snap_probe;
+            g_last_beacon = snap_beacon;
 
             evaluate_thresholds(snap_deauth, snap_probe, snap_beacon);
         }

@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "button.h"
+#include "settings.h"
 #include <FastLED.h>
 
 static CRGB leds[LED_COUNT];
@@ -41,7 +42,7 @@ static bool        fading_to_alert      = false;
 // ── Effect functions ──────────────────────────────────────────────────────────
 
 static void fx_candle() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     uint32_t now = millis();
     for (int i = 0; i < LED_COUNT; i++) {
         CandleLED& c = candle[i];
@@ -81,14 +82,14 @@ static void fx_candle() {
 }
 
 static void fx_rainbow() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     // Full hue cycle every 12 s
     uint8_t hue = (uint8_t)((millis() % 12000UL) * 255UL / 12000UL);
     fill_rainbow(leds, LED_COUNT, hue, 255 / LED_COUNT);
 }
 
 static void fx_breathe() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     // 4 s full breath cycle
     uint8_t phase = (uint8_t)((millis() % 4000UL) * 255UL / 4000UL);
     uint8_t bri   = sin8(phase);
@@ -98,7 +99,7 @@ static void fx_breathe() {
 }
 
 static void fx_drift(CRGBPalette16 palette) {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     // Slow palette scroll: 8 s cycle, LEDs offset in phase
     uint8_t index = (uint8_t)((millis() % 8000UL) * 255UL / 8000UL);
     for (int i = 0; i < LED_COUNT; i++) {
@@ -108,7 +109,7 @@ static void fx_drift(CRGBPalette16 palette) {
 }
 
 static void fx_kitt() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     const uint32_t STEP_MS    = 50;
     const uint32_t CYCLE_STEPS = 2 * (LED_COUNT - 1);
     const uint8_t  TAIL        = 4;
@@ -135,7 +136,7 @@ static float easeInOutCubic(float t) {
 }
 
 static void fx_radial_breathe() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     const uint32_t BREATH_MS   = 4000;
     const uint32_t PAUSE_TOP   = 600;
     const uint32_t PAUSE_BOT   = 400;
@@ -178,7 +179,7 @@ static void fx_radial_breathe() {
 }
 
 static void fx_plasma() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     uint16_t t = (uint16_t)(millis() / 8);
     for (int i = 0; i < LED_COUNT; i++) {
         uint8_t v = sin8((uint8_t)(i * 12 + t))      / 2 +
@@ -188,7 +189,7 @@ static void fx_plasma() {
 }
 
 static void fx_arc() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     fadeToBlackBy(leds, LED_COUNT, 80);
     if ((esp_random() % 8) == 0) {
         int start = (int)(esp_random() % (uint32_t)LED_COUNT);
@@ -201,7 +202,7 @@ static void fx_arc() {
 }
 
 static void fx_fire_red() {
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     uint16_t t = (uint16_t)(millis() * 2);
     for (int i = 0; i < LED_COUNT; i++) {
         uint8_t n = inoise8((uint16_t)(i * 40), t);
@@ -290,9 +291,9 @@ static bool fx_crossfade() {
         nblend(leds[i], ambient_snap[i], blend);
     }
 
-    // Alert→ambient only: interpolate brightness 255 → LED_BRIGHTNESS
+    // Alert→ambient only: interpolate brightness 255 → g_brightness
     if (fade_lerp_brightness) {
-        FastLED.setBrightness(lerp8by8(255, LED_BRIGHTNESS, blend));
+        FastLED.setBrightness(lerp8by8(255, g_brightness, blend));
     }
     return false;
 }
@@ -320,7 +321,7 @@ static bool fx_crossfade_to_alert(DeviceState alert_state) {
         leds[i] = fade_from[i];
         nblend(leds[i], alert_snap[i], blend);
     }
-    FastLED.setBrightness(lerp8by8(LED_BRIGHTNESS, 255, blend));
+    FastLED.setBrightness(lerp8by8(g_brightness, 255, blend));
     return false;
 }
 
@@ -328,7 +329,7 @@ static bool fx_crossfade_to_alert(DeviceState alert_state) {
 
 void renderer_init() {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
-    FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setBrightness(g_brightness);
     FastLED.setDither(BINARY_DITHER);
     FastLED.clear(true);
     seed_candle();
@@ -385,6 +386,17 @@ void renderer_task(void* pvParameters) {
 
         // Button poll (renderer task owns the button)
         bool mode_changed = button_poll(state);
+
+        // Web UI mode change — same crossfade as the physical button
+        if (g_web_mode_changed) {
+            g_web_mode_changed = false;
+            mode_changed = true;
+            if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(5))) {
+                mode = g_ambient_mode;
+                xSemaphoreGive(g_state_mutex);
+            }
+        }
+
         if (mode_changed) {
             if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(5))) {
                 mode = g_ambient_mode;

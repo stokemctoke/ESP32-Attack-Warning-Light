@@ -1,4 +1,5 @@
 #include "button.h"
+#include "settings.h"
 #include <Preferences.h>
 
 static uint32_t last_edge_ms = 0;
@@ -12,10 +13,7 @@ static void save_and_advance() {
     g_ambient_mode = next;
     xSemaphoreGive(g_state_mutex);
 
-    Preferences prefs;
-    prefs.begin("awl", false);
-    prefs.putUChar("mode", (uint8_t)next);
-    prefs.end();
+    settings_save_mode((uint8_t)next);
 
     ack_pending = true;
 }

@@ -1,19 +1,19 @@
 #pragma once
 
-// ── Hardware ──────────────────────────────────────────────────────────────────
+// ── Hardware (compile-time only — change here and reflash) ────────────────────
 #define LED_PIN         8       // GPIO to WS2812B data line
 #define LED_COUNT       10      // change to match actual strip length
-#define LED_BRIGHTNESS  80      // 0-255; keep low on USB power
 #define BUTTON_PIN      9       // mode-cycle button (pull-up, active LOW)
 
-// ── Detection ─────────────────────────────────────────────────────────────────
-#define WIFI_CHANNEL        1       // starting scan channel (1-13)
-#define ALERT_COOLDOWN      10000   // ms to stay in alert after last detection
-#define DEAUTH_THRESHOLD    10      // deauth/disassoc frames per window to trigger alert
-#define BEACON_THRESHOLD    50      // beacon frames per window (v1: raw count proxy)
-#define PROBE_THRESHOLD     15      // probe request frames per window to trigger alert
-#define DETECTION_WINDOW    2000    // ms rolling window for frame counting
-#define CHANNEL_HOP_MS      200     // ms between channel hops (1-13)
+// ── Runtime-configurable defaults (loaded from NVS; web UI can override) ──────
+#define DEFAULT_BRIGHTNESS          80      // 0-255; keep low on USB power
+#define DEFAULT_WIFI_CHANNEL        6       // AP and initial scan channel (1-13)
+#define DEFAULT_ALERT_COOLDOWN      10000   // ms to stay in alert after last detection
+#define DEFAULT_DEAUTH_THRESHOLD    10      // deauth/disassoc frames per window
+#define DEFAULT_BEACON_THRESHOLD    50      // beacon frames per window (v1: raw count proxy)
+#define DEFAULT_PROBE_THRESHOLD     15      // probe request frames per window
+#define DEFAULT_DETECTION_WINDOW    2000    // ms rolling window for frame counting
+#define DEFAULT_CHANNEL_HOP_MS      200     // ms between channel hops (1-13)
 
 // ── Button ────────────────────────────────────────────────────────────────────
 #define DEBOUNCE_MS     50
