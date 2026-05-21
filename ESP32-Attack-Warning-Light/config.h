@@ -9,9 +9,9 @@
 #define DEFAULT_BRIGHTNESS          80      // 0-255; keep low on USB power
 #define DEFAULT_WIFI_CHANNEL        6       // AP and initial scan channel (1-13)
 #define DEFAULT_ALERT_COOLDOWN      10000   // ms to stay in alert after last detection
-#define DEFAULT_DEAUTH_THRESHOLD    10      // deauth/disassoc frames per window
-#define DEFAULT_BEACON_THRESHOLD    50      // beacon frames per window (v1: raw count proxy)
-#define DEFAULT_PROBE_THRESHOLD     15      // probe request frames per window
+#define DEFAULT_DEAUTH_THRESHOLD    15      // deauth/disassoc frames per window (genuine attacks exceed 50/s)
+#define DEFAULT_BEACON_THRESHOLD    100     // beacon frames per window (multi-SSID routers push baseline high)
+#define DEFAULT_PROBE_THRESHOLD     30      // probe request frames per window (phones scanning spike this)
 #define DEFAULT_DETECTION_WINDOW    2000    // ms rolling window for frame counting
 #define DEFAULT_CHANNEL_HOP_MS      200     // ms between channel hops (1-13)
 
