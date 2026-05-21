@@ -36,5 +36,8 @@ enum AmbientMode : uint8_t {
     AMBIENT_OCEAN,
     AMBIENT_KITT,         // bouncing scanner with fading tail
     AMBIENT_RADIAL,       // radial breathe with centre-out wave and lag
+    AMBIENT_PLASMA,       // layered sine fields mapped to lava palette
+    AMBIENT_ARC,          // random blue-white electrical spark bursts
+    AMBIENT_MATRIX,       // green code-rain cascade
     AMBIENT_MODE_COUNT    // sentinel for wrap-around
 };

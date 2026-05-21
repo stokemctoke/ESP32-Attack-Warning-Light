@@ -182,6 +182,40 @@ static void fx_radial_breathe() {
     }
 }
 
+static void fx_plasma() {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    uint16_t t = (uint16_t)(millis() / 8);
+    for (int i = 0; i < LED_COUNT; i++) {
+        uint8_t v = sin8((uint8_t)(i * 12 + t))      / 2 +
+                    sin8((uint8_t)(i * 23 - t * 2))   / 2;
+        leds[i] = ColorFromPalette(LavaColors_p, v);
+    }
+}
+
+static void fx_arc() {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    fadeToBlackBy(leds, LED_COUNT, 80);
+    if ((esp_random() % 8) == 0) {
+        int start = (int)(esp_random() % (uint32_t)LED_COUNT);
+        int len   = (int)(esp_random() % 4) + 1;
+        for (int i = 0; i < len; i++) {
+            int p = start + i;
+            if (p < LED_COUNT) leds[p] = CRGB(180, 220, 255);
+        }
+    }
+}
+
+static void fx_matrix() {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    fadeToBlackBy(leds, LED_COUNT, 45);
+    if ((esp_random() % 4) == 0) {
+        leds[esp_random() % (uint32_t)LED_COUNT] = CRGB(0, 255, 70);
+    }
+    for (int i = LED_COUNT - 1; i > 0; i--) {
+        leds[i] += leds[i - 1];
+    }
+}
+
 static void fx_alert_deauth() {
     FastLED.setBrightness(255);
     // 3.6 Hz strobe (280 ms period)
@@ -237,6 +271,9 @@ static void render_ambient(AmbientMode mode) {
         case AMBIENT_OCEAN:   fx_drift(OceanColors_p);   break;
         case AMBIENT_KITT:    fx_kitt();                 break;
         case AMBIENT_RADIAL:  fx_radial_breathe();       break;
+        case AMBIENT_PLASMA:  fx_plasma();               break;
+        case AMBIENT_ARC:     fx_arc();                  break;
+        case AMBIENT_MATRIX:  fx_matrix();               break;
         default:              fx_candle();               break;
     }
 }
@@ -298,6 +335,7 @@ static bool fx_crossfade_to_alert(DeviceState alert_state) {
 void renderer_init() {
     FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, LED_COUNT);
     FastLED.setBrightness(LED_BRIGHTNESS);
+    FastLED.setDither(BINARY_DITHER);
     FastLED.clear(true);
     seed_candle();
 }
