@@ -11,6 +11,9 @@ uint32_t g_channel_hop_ms = DEFAULT_CHANNEL_HOP_MS;
 
 volatile bool g_web_mode_changed = false;
 
+volatile bool g_random_cycle    = false;
+uint32_t      g_random_dwell_ms = 30000;
+
 void settings_load() {
     Preferences prefs;
     prefs.begin("awl", true);
@@ -21,6 +24,7 @@ void settings_load() {
     g_probe_thresh   = prefs.getUInt ("probe_t",    DEFAULT_PROBE_THRESHOLD);
     g_detect_window  = prefs.getUInt ("det_win",    DEFAULT_DETECTION_WINDOW);
     g_channel_hop_ms = prefs.getUInt ("hop_ms",     DEFAULT_CHANNEL_HOP_MS);
+    g_random_dwell_ms= prefs.getUInt ("dwell_ms",   30000);
     prefs.end();
 }
 
@@ -34,6 +38,7 @@ void settings_save() {
     prefs.putUInt ("probe_t",    g_probe_thresh);
     prefs.putUInt ("det_win",    g_detect_window);
     prefs.putUInt ("hop_ms",     g_channel_hop_ms);
+    prefs.putUInt ("dwell_ms",   g_random_dwell_ms);
     prefs.end();
 }
 

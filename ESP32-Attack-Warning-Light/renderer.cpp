@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "button.h"
 #include "settings.h"
+#include "morse.h"
 #include <FastLED.h>
 
 static CRGB leds[LED_COUNT];
@@ -343,6 +344,26 @@ static bool fx_crossfade_to_alert(DeviceState alert_state) {
     return false;
 }
 
+// ── Morse renderer ────────────────────────────────────────────────────────────
+// Called from renderer_task when g_morse_active is true and device is ambient.
+// Advances the symbol sequence on timing, renders white/black to the strip.
+static void render_morse() {
+    if (millis() >= g_morse_next_ms) {
+        g_morse_pos++;
+        if (g_morse_pos >= g_morse_len) {
+            if (g_morse_loop) {
+                g_morse_pos = 0;
+            } else {
+                g_morse_active = false;
+                return; // next frame falls through to render_ambient normally
+            }
+        }
+        g_morse_next_ms = millis() + g_morse_seq[g_morse_pos].duration_ms;
+    }
+    FastLED.setBrightness(255);
+    fill_solid(leds, LED_COUNT, g_morse_seq[g_morse_pos].on ? CRGB::White : CRGB::Black);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 void renderer_init() {
@@ -354,8 +375,9 @@ void renderer_init() {
 }
 
 void renderer_task(void* pvParameters) {
-    DeviceState prev_state = STATE_AMBIENT;
-    bool        fading     = false;
+    DeviceState prev_state    = STATE_AMBIENT;
+    bool        fading        = false;
+    uint32_t    random_last_ms = 0;
 
     for (;;) {
         // Read shared state under mutex (release immediately)
@@ -404,11 +426,13 @@ void renderer_task(void* pvParameters) {
 
         // Button poll (renderer task owns the button)
         bool mode_changed = button_poll(state);
+        if (mode_changed) g_random_cycle = false; // explicit button press exits auto cycle
 
         // Web UI mode change — same crossfade as the physical button
         if (g_web_mode_changed) {
             g_web_mode_changed = false;
-            mode_changed = true;
+            g_random_cycle     = false; // explicit web mode change exits auto cycle
+            mode_changed       = true;
             if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(5))) {
                 mode = g_ambient_mode;
                 xSemaphoreGive(g_state_mutex);
@@ -429,6 +453,34 @@ void renderer_task(void* pvParameters) {
             fading               = true;
         }
 
+        // Auto cycle: pick a random mode every g_random_dwell_ms while ambient
+        if (!mode_changed && g_random_cycle &&
+            state == STATE_AMBIENT && !fading && !g_morse_active) {
+            if (millis() - random_last_ms >= g_random_dwell_ms) {
+                AmbientMode next;
+                do { next = (AmbientMode)(esp_random() % AMBIENT_MODE_COUNT);
+                } while (next == mode && AMBIENT_MODE_COUNT > 1);
+                if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(5))) {
+                    g_ambient_mode = next;
+                    mode           = next;
+                    xSemaphoreGive(g_state_mutex);
+                }
+                memcpy(fade_from, leds, sizeof(leds));
+                fade_start_ms        = millis();
+                fade_target          = mode;
+                fade_duration_ms     = 700;
+                fade_lerp_brightness = false;
+                fading               = true;
+                random_last_ms       = millis();
+            }
+        }
+
+        // Morse pending: encode on renderer task, then start playback
+        if (g_morse_pending) {
+            g_morse_pending = false;
+            morse_encode(g_morse_pending_text, (bool)g_morse_pending_loop);
+        }
+
         // Render
         if (fading) {
             bool done = fx_crossfade();
@@ -447,7 +499,8 @@ void renderer_task(void* pvParameters) {
             switch (state) {
                 case STATE_AMBIENT:
                 case STATE_TRANSITIONING:
-                    render_ambient(mode);
+                    if (g_morse_active) render_morse();
+                    else render_ambient(mode);
                     break;
                 case STATE_ALERT_DEAUTH: fx_alert_deauth(); break;
                 case STATE_ALERT_BEACON: fx_alert_beacon(); break;

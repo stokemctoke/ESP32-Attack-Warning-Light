@@ -16,6 +16,11 @@ extern uint32_t g_channel_hop_ms;
 // triggers a crossfade exactly as the physical button does.
 extern volatile bool g_web_mode_changed;
 
+// Auto cycle — cycles randomly through ambient modes every g_random_dwell_ms.
+// Not persisted; always starts false on boot.
+extern volatile bool g_random_cycle;
+extern uint32_t      g_random_dwell_ms;
+
 void settings_load();
 void settings_save();
 void settings_reset_defaults();

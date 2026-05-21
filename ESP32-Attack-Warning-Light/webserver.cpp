@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "detector.h"
 #include "renderer.h"
+#include "morse.h"
 #include "config.h"
 #include <WiFi.h>
 #include <WebServer.h>
@@ -32,11 +33,13 @@ h2{font-size:.7em;color:#666;text-transform:uppercase;letter-spacing:1px;margin-
 label{display:block;font-size:.7em;color:#888;margin:10px 0 3px}
 .val{color:#ffaa00;float:right}
 input[type=range]{width:100%;accent-color:#ff4444;display:block}
-input[type=number],select{width:100%;background:#0d0d1a;color:#ddd;border:1px solid #333;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
+input[type=number],input[type=text],select{width:100%;background:#0d0d1a;color:#ddd;border:1px solid #333;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
 .row{display:flex;gap:8px;margin-top:14px}
 button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:pointer}
-.save{background:#cc2222;color:#fff}.rst{background:#222;color:#888}
+.save{background:#cc2222;color:#fff}.rst{background:#222;color:#888}.sos{background:#004488;color:#66aaff}
 .hint{font-size:.65em;color:#444;margin-top:10px;padding-top:8px;border-top:1px solid #1e1e2e}
+.rl{display:flex;gap:14px;margin:10px 0;font-size:.8em;color:#aaa}
+.rl label{display:flex;align-items:center;gap:5px;cursor:pointer;margin:0}
 </style>
 </head>
 <body>
@@ -84,6 +87,30 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
   </div>
   <div class="hint" id="hw">LED_COUNT=? &nbsp; LED_PIN=? &nbsp; (compile-time only, reflash to change)</div>
 </div>
+<div class="card">
+  <h2>Auto Cycle</h2>
+  <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8em;color:#aaa;margin:0 0 10px">
+    <input type="checkbox" id="rc_en" onchange="applyRandom()" style="width:16px;height:16px;accent-color:#ff4444">
+    Cycle through ambient modes randomly
+  </label>
+  <label>Dwell time <span class="val" id="dwv">30</span> s</label>
+  <input type="range" id="rc_dwell" min="5" max="120" value="30" oninput="g('dwv').textContent=this.value" onchange="applyRandom()">
+</div>
+<div class="card">
+  <h2>Morse Code</h2>
+  <label>Message (A&#8211;Z, 0&#8211;9, spaces)</label>
+  <input type="text" id="morse_txt" maxlength="40" placeholder="e.g. HELLO WORLD">
+  <div class="rl">
+    <label><input type="radio" name="morse_loop" value="0" checked style="accent-color:#ff4444"> Once</label>
+    <label><input type="radio" name="morse_loop" value="1" style="accent-color:#ff4444"> Loop</label>
+  </div>
+  <div class="row">
+    <button class="save" onclick="txMorse()">Send</button>
+    <button class="sos" onclick="txSOS()">SOS</button>
+    <button class="rst" onclick="stopMorse()">Stop</button>
+  </div>
+  <div id="morse_status" style="font-size:.7em;color:#666;margin-top:8px"></div>
+</div>
 <script>
 var bv=document.getElementById('bv'),
     dv=document.getElementById('dv'),
@@ -100,6 +127,7 @@ function loadSettings(){
     g('cooldown').value=d.cooldown;
     g('det_win').value=d.det_win;
     g('hop_ms').value=d.hop_ms;
+    g('rc_dwell').value=d.dwell_s; g('dwv').textContent=d.dwell_s;
     g('hw').textContent='LED_COUNT='+d.led_count+'  LED_PIN='+d.led_pin+'  (compile-time only, reflash to change)';
   }).catch(function(){});
 }
@@ -113,6 +141,8 @@ function pollStatus(){
     g('cb').textContent=d.beacon;
     g('cp').textContent=d.probe;
     g('hbanner').style.display=d.hopping?'none':'block';
+    g('rc_en').checked=d.auto_cycle;
+    if(!d.morse_active) g('morse_status').textContent='';
   }).catch(function(){});
 }
 function saveSettings(){
@@ -131,6 +161,26 @@ function saveSettings(){
 }
 function resetSettings(){
   fetch('/reset',{method:'POST'}).then(function(){loadSettings();}).catch(function(){});
+}
+function applyRandom(){
+  var p=new URLSearchParams({enabled:g('rc_en').checked?1:0,dwell_s:g('rc_dwell').value});
+  fetch('/random',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()}).catch(function(){});
+}
+function txMorse(){
+  var txt=g('morse_txt').value.trim();
+  if(!txt)return;
+  var lp=document.querySelector('input[name=morse_loop]:checked').value;
+  var p=new URLSearchParams({text:txt,loop:lp});
+  fetch('/morse',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()})
+    .then(function(){g('morse_status').textContent='Sending…';}).catch(function(){});
+}
+function txSOS(){
+  fetch('/sos',{method:'POST'})
+    .then(function(){g('morse_status').textContent='SOS looping…';}).catch(function(){});
+}
+function stopMorse(){
+  fetch('/morse/stop',{method:'POST'})
+    .then(function(){g('morse_status').textContent='';}).catch(function(){});
 }
 loadSettings();
 pollStatus();
@@ -187,17 +237,20 @@ static void handle_status() {
         return;
     }
 
-    char json[256];
+    char json[320];
     snprintf(json, sizeof(json),
         "{\"state\":\"%s\",\"mode\":%d,\"mode_name\":\"%s\","
-        "\"deauth\":%lu,\"beacon\":%lu,\"probe\":%lu,\"hopping\":%d}",
+        "\"deauth\":%lu,\"beacon\":%lu,\"probe\":%lu,"
+        "\"hopping\":%d,\"morse_active\":%d,\"auto_cycle\":%d}",
         state_to_str(state),
         (int)mode,
         mode_to_str(mode),
         (unsigned long)g_last_deauth,
         (unsigned long)g_last_beacon,
         (unsigned long)g_last_probe,
-        (WiFi.softAPgetStationNum() == 0) ? 1 : 0
+        (WiFi.softAPgetStationNum() == 0) ? 1 : 0,
+        g_morse_active ? 1 : 0,
+        g_random_cycle ? 1 : 0
     );
     server.send(200, "application/json", json);
 }
@@ -212,12 +265,12 @@ static void handle_settings_get() {
         return;
     }
 
-    char json[256];
+    char json[320];
     snprintf(json, sizeof(json),
         "{\"brightness\":%d,\"mode\":%d,"
         "\"deauth_t\":%lu,\"beacon_t\":%lu,\"probe_t\":%lu,"
         "\"cooldown\":%lu,\"det_win\":%lu,\"hop_ms\":%lu,"
-        "\"led_count\":%d,\"led_pin\":%d}",
+        "\"dwell_s\":%lu,\"led_count\":%d,\"led_pin\":%d}",
         (int)g_brightness,
         (int)mode,
         (unsigned long)g_deauth_thresh,
@@ -226,6 +279,7 @@ static void handle_settings_get() {
         (unsigned long)g_alert_cooldown,
         (unsigned long)g_detect_window,
         (unsigned long)g_channel_hop_ms,
+        (unsigned long)(g_random_dwell_ms / 1000),
         LED_COUNT,
         LED_PIN
     );
@@ -280,7 +334,6 @@ static void handle_settings_post() {
 static void handle_reset() {
     settings_reset_defaults();
 
-    // Reset mode to candle and trigger crossfade
     if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(100))) {
         g_ambient_mode = AMBIENT_CANDLE;
         xSemaphoreGive(g_state_mutex);
@@ -288,6 +341,54 @@ static void handle_reset() {
     g_web_mode_changed = true;
     settings_save_mode(AMBIENT_CANDLE);
 
+    server.send(200, "text/plain", "OK");
+}
+
+static void handle_random() {
+    if (server.hasArg("enabled")) {
+        g_random_cycle = server.arg("enabled").toInt() != 0;
+    }
+    if (server.hasArg("dwell_s")) {
+        int v = server.arg("dwell_s").toInt();
+        if (v >= 5 && v <= 120) {
+            g_random_dwell_ms = (uint32_t)v * 1000;
+            settings_save();
+        }
+    }
+    server.send(200, "text/plain", "OK");
+}
+
+static void handle_morse_post() {
+    if (!server.hasArg("text") || !server.hasArg("loop")) {
+        server.send(400, "text/plain", "Bad Request");
+        return;
+    }
+    String txt = server.arg("text");
+    txt.trim();
+    if (txt.length() == 0 || txt.length() > 127) {
+        server.send(400, "text/plain", "Bad Request");
+        return;
+    }
+    g_morse_active       = false;
+    g_morse_pending_loop = server.arg("loop").toInt() != 0;
+    strncpy(g_morse_pending_text, txt.c_str(), sizeof(g_morse_pending_text) - 1);
+    g_morse_pending_text[sizeof(g_morse_pending_text) - 1] = '\0';
+    g_morse_pending      = true;
+    server.send(200, "text/plain", "OK");
+}
+
+static void handle_sos() {
+    g_morse_active       = false;
+    g_morse_pending_loop = true;
+    strncpy(g_morse_pending_text, "SOS", sizeof(g_morse_pending_text) - 1);
+    g_morse_pending_text[sizeof(g_morse_pending_text) - 1] = '\0';
+    g_morse_pending      = true;
+    server.send(200, "text/plain", "OK");
+}
+
+static void handle_morse_stop() {
+    g_morse_pending = false;
+    g_morse_active  = false;
     server.send(200, "text/plain", "OK");
 }
 
@@ -305,11 +406,15 @@ static void webserver_task(void* pvParameters) {
 void webserver_init() {
     WiFi.softAP("AttackLight", nullptr, DEFAULT_WIFI_CHANNEL);
 
-    server.on("/",        HTTP_GET,  handle_root);
-    server.on("/status",  HTTP_GET,  handle_status);
-    server.on("/settings",HTTP_GET,  handle_settings_get);
-    server.on("/settings",HTTP_POST, handle_settings_post);
-    server.on("/reset",   HTTP_POST, handle_reset);
+    server.on("/",          HTTP_GET,  handle_root);
+    server.on("/status",    HTTP_GET,  handle_status);
+    server.on("/settings",  HTTP_GET,  handle_settings_get);
+    server.on("/settings",  HTTP_POST, handle_settings_post);
+    server.on("/reset",     HTTP_POST, handle_reset);
+    server.on("/random",    HTTP_POST, handle_random);
+    server.on("/morse",     HTTP_POST, handle_morse_post);
+    server.on("/sos",       HTTP_POST, handle_sos);
+    server.on("/morse/stop",HTTP_POST, handle_morse_stop);
     server.begin();
 
     xTaskCreate(webserver_task, "webserver", 8192, NULL, 3, NULL);
