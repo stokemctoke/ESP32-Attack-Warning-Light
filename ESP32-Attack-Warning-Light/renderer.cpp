@@ -213,13 +213,26 @@ static void fx_fire_red() {
 
 static void fx_alert_deauth() {
     FastLED.setBrightness(255);
-    // Police flash: red 150 ms → black 50 ms → blue 150 ms → black 50 ms (2.5 Hz cycle)
-    uint32_t t = millis() % 400UL;
-    CRGB colour;
-    if      (t < 150UL) colour = CRGB::Red;
-    else if (t < 200UL) colour = CRGB::Black;
-    else if (t < 350UL) colour = CRGB::Blue;
-    else                colour = CRGB::Black;
+    // Double-flash police pattern: R-R--B-B-- (asymmetric gaps break the metronomic feel)
+    static const struct { uint16_t dur; CRGB col; } steps[] = {
+        { 65, CRGB::Red   },
+        { 35, CRGB::Black },
+        { 65, CRGB::Red   },
+        {110, CRGB::Black },
+        { 65, CRGB::Blue  },
+        { 35, CRGB::Black },
+        { 65, CRGB::Blue  },
+        {110, CRGB::Black },
+    };
+    static const uint16_t TOTAL = 550; // sum of all dur values above
+
+    uint32_t t = millis() % TOTAL;
+    uint16_t acc = 0;
+    CRGB colour = CRGB::Black;
+    for (uint8_t i = 0; i < 8; i++) {
+        acc += steps[i].dur;
+        if (t < acc) { colour = steps[i].col; break; }
+    }
     fill_solid(leds, LED_COUNT, colour);
 }
 
