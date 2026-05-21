@@ -36,6 +36,7 @@ static uint32_t    fade_start_ms        = 0;
 static AmbientMode fade_target          = AMBIENT_CANDLE;
 static uint32_t    fade_duration_ms     = 2000;
 static bool        fade_lerp_brightness = false; // true only for alert→ambient
+static bool        fading_to_alert      = false;
 
 // ── Effect functions ──────────────────────────────────────────────────────────
 
@@ -188,6 +189,33 @@ static bool fx_crossfade() {
     return false;
 }
 
+// Fades from ambient snapshot into an alert effect over 250 ms.
+// Renders the alert on the final frame so the caller can simply clear the flag.
+static bool fx_crossfade_to_alert(DeviceState alert_state) {
+    // Render alert target into leds[] (also serves as the final frame when done)
+    switch (alert_state) {
+        case STATE_ALERT_DEAUTH: fx_alert_deauth(); break;
+        case STATE_ALERT_BEACON: fx_alert_beacon(); break;
+        case STATE_ALERT_PROBE:  fx_alert_probe();  break;
+        case STATE_ALERT_MULTI:  fx_alert_multi();  break;
+        default: return true;
+    }
+
+    uint32_t elapsed = millis() - fade_start_ms;
+    if (elapsed >= 250UL) return true; // alert already rendered above; we're done
+
+    uint8_t blend = (uint8_t)(elapsed * 255UL / 250UL);
+    CRGB alert_snap[LED_COUNT];
+    memcpy(alert_snap, leds, sizeof(leds));
+
+    for (int i = 0; i < LED_COUNT; i++) {
+        leds[i] = fade_from[i];
+        nblend(leds[i], alert_snap[i], blend);
+    }
+    FastLED.setBrightness(lerp8by8(LED_BRIGHTNESS, 255, blend));
+    return false;
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 void renderer_init() {
@@ -214,10 +242,20 @@ void renderer_task(void* pvParameters) {
             continue;
         }
 
-        // Abort fade if a new alert fires during the transition
+        // Abort ambient fade if a new alert fires
         if (fading && state != STATE_TRANSITIONING && state != STATE_AMBIENT) {
             fading = false;
         }
+
+        // Detect ambient → alert edge: begin 250 ms fade-in
+        bool now_alert   = (state != STATE_AMBIENT && state != STATE_TRANSITIONING);
+        bool was_ambient = (prev_state == STATE_AMBIENT || prev_state == STATE_TRANSITIONING);
+        if (now_alert && was_ambient && !fading_to_alert) {
+            memcpy(fade_from, leds, sizeof(leds));
+            fade_start_ms   = millis();
+            fading_to_alert = true;
+        }
+        if (fading_to_alert && !now_alert) fading_to_alert = false;
 
         // Detect alert → ambient edge: begin crossfade
         bool was_alert = (prev_state != STATE_AMBIENT &&
@@ -258,13 +296,14 @@ void renderer_task(void* pvParameters) {
             if (done) {
                 fading = false;
                 if (xSemaphoreTake(g_state_mutex, pdMS_TO_TICKS(5))) {
-                    // Only reset if still TRANSITIONING (a new alert may have fired)
                     if (g_device_state == STATE_TRANSITIONING) {
                         g_device_state = STATE_AMBIENT;
                     }
                     xSemaphoreGive(g_state_mutex);
                 }
             }
+        } else if (fading_to_alert) {
+            if (fx_crossfade_to_alert(state)) fading_to_alert = false;
         } else {
             switch (state) {
                 case STATE_AMBIENT:
