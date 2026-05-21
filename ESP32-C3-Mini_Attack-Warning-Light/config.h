@@ -34,5 +34,7 @@ enum AmbientMode : uint8_t {
     AMBIENT_BREATHE,
     AMBIENT_FOREST,
     AMBIENT_OCEAN,
+    AMBIENT_KITT,         // bouncing scanner with fading tail
+    AMBIENT_RADIAL,       // radial breathe with centre-out wave and lag
     AMBIENT_MODE_COUNT    // sentinel for wrap-around
 };

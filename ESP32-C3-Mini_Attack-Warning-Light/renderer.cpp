@@ -107,6 +107,81 @@ static void fx_drift(CRGBPalette16 palette) {
     }
 }
 
+static void fx_kitt() {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    const uint32_t STEP_MS    = 50;
+    const uint32_t CYCLE_STEPS = 2 * (LED_COUNT - 1);
+    const uint8_t  TAIL        = 4;
+
+    int step = (int)((millis() / STEP_MS) % CYCLE_STEPS);
+    int pos  = (step < LED_COUNT) ? step : (int)CYCLE_STEPS - step;
+    int dir  = (step < LED_COUNT) ? 1 : -1;
+
+    fill_solid(leds, LED_COUNT, CRGB::Black);
+    for (int t = 1; t <= TAIL; t++) {
+        int tailPos = pos - dir * t;
+        if (tailPos >= 0 && tailPos < LED_COUNT) {
+            uint8_t bri = 220 >> t; // 110, 55, 27, 13
+            leds[tailPos] = CRGB(bri, 0, 0);
+        }
+    }
+    leds[pos] = CRGB(255, 0, 0);
+}
+
+static float easeInOutCubic(float t) {
+    if (t < 0.5f) return 4.0f * t * t * t;
+    float u = -2.0f * t + 2.0f;
+    return 1.0f - (u * u * u) / 2.0f;
+}
+
+static void fx_radial_breathe() {
+    FastLED.setBrightness(LED_BRIGHTNESS);
+    const uint32_t BREATH_MS   = 4000;
+    const uint32_t PAUSE_TOP   = 600;
+    const uint32_t PAUSE_BOT   = 400;
+    const uint32_t HALF_CYCLE  = (BREATH_MS - PAUSE_TOP - PAUSE_BOT) / 2;
+    const float    EDGE_FALLOFF = 0.35f;   // outermost LED at 35% of centre brightness
+    const float    LAG_MS       = 80.0f;   // ms lag per unit of distance from centre
+    const uint8_t  BRIGHT_MIN   = 15;
+    const float    CENTRE       = (LED_COUNT - 1) / 2.0f;
+    // Warm amber-white
+    const uint8_t R = 255, G = 210, B = 140;
+
+    uint32_t phase = millis() % BREATH_MS;
+
+    for (int i = 0; i < LED_COUNT; i++) {
+        float distance = fabsf((float)i - CENTRE);
+        float falloff  = 1.0f - (distance * (1.0f - EDGE_FALLOFF) / CENTRE);
+        float lag      = distance * LAG_MS / (float)HALF_CYCLE;
+
+        float t;
+        if (phase < HALF_CYCLE) {
+            t = (float)phase / (float)HALF_CYCLE - lag;
+        } else if (phase < HALF_CYCLE + PAUSE_TOP) {
+            t = 1.0f;
+        } else if (phase < 2 * HALF_CYCLE + PAUSE_TOP) {
+            t = 1.0f - (float)(phase - (HALF_CYCLE + PAUSE_TOP)) / (float)HALF_CYCLE - lag;
+        } else {
+            t = 0.0f;
+        }
+        t = constrain(t, 0.0f, 1.0f);
+
+        float curved = easeInOutCubic(t);
+
+        // Centre LEDs hold at BRIGHT_MIN floor; outer LEDs go to true zero
+        float floorFraction = (CENTRE > 0.0f) ? 1.0f - (distance / CENTRE) : 1.0f;
+        float floor = (float)BRIGHT_MIN * floorFraction;
+
+        uint8_t bright = (uint8_t)(floor + curved * (255.0f * falloff - floor));
+
+        leds[i] = CRGB(
+            (uint8_t)((float)R * bright / 255.0f),
+            (uint8_t)((float)G * bright / 255.0f),
+            (uint8_t)((float)B * bright / 255.0f)
+        );
+    }
+}
+
 static void fx_alert_deauth() {
     FastLED.setBrightness(255);
     // 3.6 Hz strobe (280 ms period)
@@ -155,12 +230,14 @@ static void fx_alert_multi() {
 // crossfade target computation.
 static void render_ambient(AmbientMode mode) {
     switch (mode) {
-        case AMBIENT_CANDLE:  fx_candle();             break;
-        case AMBIENT_RAINBOW: fx_rainbow();            break;
-        case AMBIENT_BREATHE: fx_breathe();            break;
-        case AMBIENT_FOREST:  fx_drift(ForestColors_p); break;
-        case AMBIENT_OCEAN:   fx_drift(OceanColors_p);  break;
-        default:              fx_candle();             break;
+        case AMBIENT_CANDLE:  fx_candle();               break;
+        case AMBIENT_RAINBOW: fx_rainbow();              break;
+        case AMBIENT_BREATHE: fx_breathe();              break;
+        case AMBIENT_FOREST:  fx_drift(ForestColors_p);  break;
+        case AMBIENT_OCEAN:   fx_drift(OceanColors_p);   break;
+        case AMBIENT_KITT:    fx_kitt();                 break;
+        case AMBIENT_RADIAL:  fx_radial_breathe();       break;
+        default:              fx_candle();               break;
     }
 }
 
