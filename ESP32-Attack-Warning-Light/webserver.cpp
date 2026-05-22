@@ -19,10 +19,10 @@ static const char HTML_PAGE[] PROGMEM = R"WEBPAGE(<!DOCTYPE html>
 <title>Attack Warning Light</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:monospace;background:#1a1a1f;color:#f4f6f8;max-width:460px;margin:0 auto;padding:14px}
-h1{color:#ffff00;font-size:1em;margin-bottom:14px;text-transform:uppercase;letter-spacing:3px}
+body{font-family:monospace;background:#1a1a1f;color:#ffff00;max-width:460px;margin:0 auto;padding:14px}
+h1{color:#faa307;font-size:1em;margin-bottom:14px;text-transform:uppercase;letter-spacing:3px}
 .card{background:#22222a;border:1px solid #303038;border-radius:6px;padding:14px;margin-bottom:10px}
-h2{font-size:.7em;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+h2{font-size:.7em;color:#faa307;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 .sstate{font-size:1.1em;font-weight:bold}
 .ok{color:#00ffff}.alrt{color:#faa307}
 .counts{display:flex;gap:10px;margin-top:10px}
@@ -31,9 +31,9 @@ h2{font-size:.7em;color:#666;text-transform:uppercase;letter-spacing:1px;margin-
 .cnt .lbl{font-size:.6em;color:#666;display:block;margin-top:2px}
 .banner{background:#faa307;color:#1a1a1f;font-size:.75em;padding:7px 10px;border-radius:4px;margin-bottom:10px}
 label{display:block;font-size:.7em;color:#888;margin:10px 0 3px}
-.val{color:#faa307;float:right}
-input[type=range]{width:100%;accent-color:#ffff00;display:block}
-input[type=number],input[type=text],select{width:100%;background:#1a1a1f;color:#f4f6f8;border:1px solid #303038;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
+.val{color:#ffff00;float:right}
+input[type=range]{width:100%;accent-color:#00ffff;display:block}
+input[type=number],input[type=text],select{width:100%;background:#1a1a1f;color:#ffff00;border:1px solid #303038;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
 input[type=color]{width:100%;height:42px;padding:3px 4px;border:1px solid #303038;border-radius:4px;background:#1a1a1f;cursor:pointer}
 .row{display:flex;gap:8px;margin-top:14px}
 button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:pointer}
@@ -108,7 +108,7 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
 <div class="card">
   <h2>Auto Cycle</h2>
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8em;color:#aaa;margin:0 0 10px">
-    <input type="checkbox" id="rc_en" onchange="applyRandom()" style="width:16px;height:16px;accent-color:#ffff00">
+    <input type="checkbox" id="rc_en" onchange="applyRandom()" style="width:16px;height:16px;accent-color:#00ffff">
     Cycle through ambient modes randomly
   </label>
   <label>Dwell time <span class="val" id="dwv">30</span> s</label>
@@ -119,8 +119,8 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
   <label>Message (A&#8211;Z, 0&#8211;9, spaces)</label>
   <input type="text" id="morse_txt" maxlength="40" placeholder="e.g. HELLO WORLD">
   <div class="rl">
-    <label><input type="radio" name="morse_loop" value="0" checked style="accent-color:#ffff00"> Once</label>
-    <label><input type="radio" name="morse_loop" value="1" style="accent-color:#ffff00"> Loop</label>
+    <label><input type="radio" name="morse_loop" value="0" checked style="accent-color:#00ffff"> Once</label>
+    <label><input type="radio" name="morse_loop" value="1" style="accent-color:#00ffff"> Loop</label>
   </div>
   <div class="row">
     <button class="save" onclick="txMorse()">Send</button>
