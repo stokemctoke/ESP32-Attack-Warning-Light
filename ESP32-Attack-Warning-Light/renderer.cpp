@@ -212,6 +212,11 @@ static void fx_fire_red() {
     }
 }
 
+static void fx_solid() {
+    FastLED.setBrightness(g_brightness);
+    fill_solid(leds, LED_COUNT, CRGB(g_custom_r, g_custom_g, g_custom_b));
+}
+
 static void fx_alert_deauth() {
     FastLED.setBrightness(255);
     // Double-flash police pattern: R-R--B-B-- (asymmetric gaps break the metronomic feel)
@@ -288,6 +293,7 @@ static void render_ambient(AmbientMode mode) {
         case AMBIENT_PLASMA:  fx_plasma();               break;
         case AMBIENT_ARC:     fx_arc();                  break;
         case AMBIENT_FIRE:    fx_fire_red();              break;
+        case AMBIENT_SOLID:   fx_solid();                break;
         default:              fx_candle();               break;
     }
 }

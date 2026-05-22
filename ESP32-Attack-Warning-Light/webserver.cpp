@@ -34,6 +34,7 @@ label{display:block;font-size:.7em;color:#888;margin:10px 0 3px}
 .val{color:#ffaa00;float:right}
 input[type=range]{width:100%;accent-color:#ff4444;display:block}
 input[type=number],input[type=text],select{width:100%;background:#0d0d1a;color:#ddd;border:1px solid #333;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
+input[type=color]{width:100%;height:42px;padding:3px 4px;border:1px solid #333;border-radius:4px;background:#0d0d1a;cursor:pointer}
 .row{display:flex;gap:8px;margin-top:14px}
 button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:pointer}
 .save{background:#cc2222;color:#fff}.rst{background:#222;color:#888}.sos{background:#004488;color:#66aaff}
@@ -60,13 +61,18 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
   <label>Brightness <span class="val" id="bv">80</span></label>
   <input type="range" id="brightness" min="10" max="255" oninput="bv.textContent=this.value">
   <label>Ambient Mode</label>
-  <select id="mode">
+  <select id="mode" onchange="onModeChange()">
     <option value="0">Candle</option><option value="1">Rainbow</option>
     <option value="2">Breathe</option><option value="3">Forest</option>
     <option value="4">Ocean</option><option value="5">KITT</option>
     <option value="6">Radial Breathe</option><option value="7">Plasma</option>
     <option value="8">Electric Arc</option><option value="9">Fire</option>
+    <option value="10">Solid Colour</option>
   </select>
+  <div id="cc_row" style="display:none">
+    <label>Colour</label>
+    <input type="color" id="custom_col" value="#ffffd0">
+  </div>
   <h2 style="margin-top:14px">Alert Thresholds <span style="font-weight:normal;color:#444">(frames / window)</span></h2>
   <label>Deauth <span class="val" id="dv">10</span></label>
   <input type="range" id="deauth_t" min="1" max="200" oninput="dv.textContent=this.value">
@@ -117,6 +123,9 @@ var bv=document.getElementById('bv'),
     bkv=document.getElementById('bkv'),
     pv=document.getElementById('pv');
 function g(id){return document.getElementById(id)}
+function hexToRgb(h){return{r:parseInt(h.slice(1,3),16),g:parseInt(h.slice(3,5),16),b:parseInt(h.slice(5,7),16)}}
+function rgbToHex(r,gv,b){return'#'+[r,gv,b].map(function(v){return('0'+v.toString(16)).slice(-2)}).join('')}
+function onModeChange(){g('cc_row').style.display=g('mode').value=='10'?'block':'none'}
 function loadSettings(){
   fetch('/settings').then(r=>r.json()).then(d=>{
     g('brightness').value=d.brightness; bv.textContent=d.brightness;
@@ -128,6 +137,8 @@ function loadSettings(){
     g('det_win').value=d.det_win;
     g('hop_ms').value=d.hop_ms;
     g('rc_dwell').value=d.dwell_s; g('dwv').textContent=d.dwell_s;
+    g('custom_col').value=rgbToHex(d.custom_r,d.custom_g,d.custom_b);
+    g('cc_row').style.display=d.mode==10?'block':'none';
     g('hw').textContent='LED_COUNT='+d.led_count+'  LED_PIN='+d.led_pin+'  (compile-time only, reflash to change)';
   }).catch(function(){});
 }
@@ -146,6 +157,7 @@ function pollStatus(){
   }).catch(function(){});
 }
 function saveSettings(){
+  var rgb=hexToRgb(g('custom_col').value);
   var p=new URLSearchParams({
     brightness:g('brightness').value,
     mode:g('mode').value,
@@ -154,7 +166,8 @@ function saveSettings(){
     probe_t:g('probe_t').value,
     cooldown:g('cooldown').value,
     det_win:g('det_win').value,
-    hop_ms:g('hop_ms').value
+    hop_ms:g('hop_ms').value,
+    custom_r:rgb.r,custom_g:rgb.g,custom_b:rgb.b
   });
   fetch('/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:p.toString()})
     .then(function(){loadSettings();}).catch(function(){});
@@ -215,6 +228,7 @@ static const char* mode_to_str(AmbientMode m) {
         case AMBIENT_PLASMA:  return "Plasma";
         case AMBIENT_ARC:     return "Electric Arc";
         case AMBIENT_FIRE:    return "Fire";
+        case AMBIENT_SOLID:   return "Solid Colour";
         default:              return "Unknown";
     }
 }
@@ -265,12 +279,13 @@ static void handle_settings_get() {
         return;
     }
 
-    char json[320];
+    char json[384];
     snprintf(json, sizeof(json),
         "{\"brightness\":%d,\"mode\":%d,"
         "\"deauth_t\":%lu,\"beacon_t\":%lu,\"probe_t\":%lu,"
         "\"cooldown\":%lu,\"det_win\":%lu,\"hop_ms\":%lu,"
-        "\"dwell_s\":%lu,\"led_count\":%d,\"led_pin\":%d}",
+        "\"dwell_s\":%lu,\"custom_r\":%d,\"custom_g\":%d,\"custom_b\":%d,"
+        "\"led_count\":%d,\"led_pin\":%d}",
         (int)g_brightness,
         (int)mode,
         (unsigned long)g_deauth_thresh,
@@ -280,6 +295,9 @@ static void handle_settings_get() {
         (unsigned long)g_detect_window,
         (unsigned long)g_channel_hop_ms,
         (unsigned long)(g_random_dwell_ms / 1000),
+        (int)g_custom_r,
+        (int)g_custom_g,
+        (int)g_custom_b,
         LED_COUNT,
         LED_PIN
     );
@@ -290,6 +308,18 @@ static void handle_settings_post() {
     if (server.hasArg("brightness")) {
         int v = server.arg("brightness").toInt();
         if (v >= 10 && v <= 255) g_brightness = (uint8_t)v;
+    }
+    if (server.hasArg("custom_r")) {
+        int v = server.arg("custom_r").toInt();
+        if (v >= 0 && v <= 255) g_custom_r = (uint8_t)v;
+    }
+    if (server.hasArg("custom_g")) {
+        int v = server.arg("custom_g").toInt();
+        if (v >= 0 && v <= 255) g_custom_g = (uint8_t)v;
+    }
+    if (server.hasArg("custom_b")) {
+        int v = server.arg("custom_b").toInt();
+        if (v >= 0 && v <= 255) g_custom_b = (uint8_t)v;
     }
     if (server.hasArg("deauth_t")) {
         int v = server.arg("deauth_t").toInt();

@@ -39,5 +39,11 @@ enum AmbientMode : uint8_t {
     AMBIENT_PLASMA,       // layered sine fields mapped to lava palette
     AMBIENT_ARC,          // random blue-white electrical spark bursts
     AMBIENT_FIRE,         // perlin noise red fire — coherent flame body
+    AMBIENT_SOLID,        // user-defined solid colour from web UI
     AMBIENT_MODE_COUNT    // sentinel for wrap-around
 };
+
+// ── Custom solid-colour defaults ──────────────────────────────────────────────
+#define DEFAULT_CUSTOM_R    255
+#define DEFAULT_CUSTOM_G    255
+#define DEFAULT_CUSTOM_B    220

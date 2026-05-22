@@ -5,6 +5,9 @@
 // Runtime-configurable settings — loaded from NVS on boot, saved on web change.
 // All reads/writes are safe without a mutex (8/32-bit aligned, ESP32 atomic).
 extern uint8_t  g_brightness;
+extern uint8_t  g_custom_r;
+extern uint8_t  g_custom_g;
+extern uint8_t  g_custom_b;
 extern uint32_t g_alert_cooldown;
 extern uint32_t g_deauth_thresh;
 extern uint32_t g_beacon_thresh;
