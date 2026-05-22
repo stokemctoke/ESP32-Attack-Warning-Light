@@ -19,31 +19,31 @@ static const char HTML_PAGE[] PROGMEM = R"WEBPAGE(<!DOCTYPE html>
 <title>Attack Warning Light</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:monospace;background:#0d0d1a;color:#ddd;max-width:460px;margin:0 auto;padding:14px}
-h1{color:#ff4444;font-size:1em;margin-bottom:14px;text-transform:uppercase;letter-spacing:3px}
-.card{background:#151524;border:1px solid #2a2a3a;border-radius:6px;padding:14px;margin-bottom:10px}
+body{font-family:monospace;background:#1a1a1f;color:#f4f6f8;max-width:460px;margin:0 auto;padding:14px}
+h1{color:#ffff00;font-size:1em;margin-bottom:14px;text-transform:uppercase;letter-spacing:3px}
+.card{background:#22222a;border:1px solid #303038;border-radius:6px;padding:14px;margin-bottom:10px}
 h2{font-size:.7em;color:#666;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 .sstate{font-size:1.1em;font-weight:bold}
-.ok{color:#44cc66}.alrt{color:#ff4444}
+.ok{color:#00ffff}.alrt{color:#faa307}
 .counts{display:flex;gap:10px;margin-top:10px}
-.cnt{flex:1;background:#0d0d1a;padding:8px 4px;border-radius:4px;text-align:center}
-.cnt .n{font-size:1.3em;color:#ffaa00}
+.cnt{flex:1;background:#1a1a1f;padding:8px 4px;border-radius:4px;text-align:center}
+.cnt .n{font-size:1.3em;color:#ffff00}
 .cnt .lbl{font-size:.6em;color:#666;display:block;margin-top:2px}
-.banner{background:#ff8800;color:#000;font-size:.75em;padding:7px 10px;border-radius:4px;margin-bottom:10px}
+.banner{background:#faa307;color:#1a1a1f;font-size:.75em;padding:7px 10px;border-radius:4px;margin-bottom:10px}
 label{display:block;font-size:.7em;color:#888;margin:10px 0 3px}
-.val{color:#ffaa00;float:right}
-input[type=range]{width:100%;accent-color:#ff4444;display:block}
-input[type=number],input[type=text],select{width:100%;background:#0d0d1a;color:#ddd;border:1px solid #333;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
-input[type=color]{width:100%;height:42px;padding:3px 4px;border:1px solid #333;border-radius:4px;background:#0d0d1a;cursor:pointer}
+.val{color:#faa307;float:right}
+input[type=range]{width:100%;accent-color:#ffff00;display:block}
+input[type=number],input[type=text],select{width:100%;background:#1a1a1f;color:#f4f6f8;border:1px solid #303038;border-radius:4px;padding:5px 8px;font:inherit;font-size:.85em}
+input[type=color]{width:100%;height:42px;padding:3px 4px;border:1px solid #303038;border-radius:4px;background:#1a1a1f;cursor:pointer}
 .row{display:flex;gap:8px;margin-top:14px}
 button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:pointer}
-.save{background:#cc2222;color:#fff}.rst{background:#222;color:#888}.sos{background:#004488;color:#66aaff}
-.hint{font-size:.65em;color:#444;margin-top:10px;padding-top:8px;border-top:1px solid #1e1e2e}
+.save{background:#faa307;color:#1a1a1f}.rst{background:#2a2a32;color:#888}.sos{background:#00ffff;color:#1a1a1f}
+.hint{font-size:.65em;color:#555;margin-top:10px;padding-top:8px;border-top:1px solid #252530}
 .rl{display:flex;gap:14px;margin:10px 0;font-size:.8em;color:#aaa}
 .rl label{display:flex;align-items:center;gap:5px;cursor:pointer;margin:0}
-.pkt{border-top:1px solid #1e1e2e;padding:7px 0;font-size:.7em}
+.pkt{border-top:1px solid #252530;padding:7px 0;font-size:.7em}
 .pkt:first-child{border-top:none;padding-top:0}
-.pt{margin-bottom:3px}.pt.de{color:#ff6666}.pt.di{color:#ff9933}
+.pt{margin-bottom:3px}.pt.de{color:#faa307}.pt.di{color:#ffff00}
 .pm{color:#666}
 </style>
 </head>
@@ -108,7 +108,7 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
 <div class="card">
   <h2>Auto Cycle</h2>
   <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8em;color:#aaa;margin:0 0 10px">
-    <input type="checkbox" id="rc_en" onchange="applyRandom()" style="width:16px;height:16px;accent-color:#ff4444">
+    <input type="checkbox" id="rc_en" onchange="applyRandom()" style="width:16px;height:16px;accent-color:#ffff00">
     Cycle through ambient modes randomly
   </label>
   <label>Dwell time <span class="val" id="dwv">30</span> s</label>
@@ -119,8 +119,8 @@ button{flex:1;padding:9px;border:none;border-radius:4px;font:inherit;cursor:poin
   <label>Message (A&#8211;Z, 0&#8211;9, spaces)</label>
   <input type="text" id="morse_txt" maxlength="40" placeholder="e.g. HELLO WORLD">
   <div class="rl">
-    <label><input type="radio" name="morse_loop" value="0" checked style="accent-color:#ff4444"> Once</label>
-    <label><input type="radio" name="morse_loop" value="1" style="accent-color:#ff4444"> Loop</label>
+    <label><input type="radio" name="morse_loop" value="0" checked style="accent-color:#ffff00"> Once</label>
+    <label><input type="radio" name="morse_loop" value="1" style="accent-color:#ffff00"> Loop</label>
   </div>
   <div class="row">
     <button class="save" onclick="txMorse()">Send</button>
@@ -178,7 +178,7 @@ function fetchAlerts(){
     el.innerHTML=d.entries.map(function(e){
       var age_s=now_s-Math.round(e.t/1000);
       var age=age_s<60?age_s+'s ago':Math.round(age_s/60)+'m ago';
-      var col=e.type===1||e.type===4?'#ff6666':'#ffaa00';
+      var col=e.type===1||e.type===4?'#faa307':'#ffff00';
       return '<div class="pkt"><span style="color:'+col+'">'+(names[e.type]||'Alert')+'</span>'
            + ' &nbsp;<span style="color:#666;font-size:.9em">'+age+'</span></div>';
     }).join('');
